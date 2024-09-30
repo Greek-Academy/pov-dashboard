@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poverty Rate Map</title>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <style>
+    .year-tab {
+      padding: 10px;
+      background-color: lightgray;
+      border: none;
+      cursor: pointer;
+    }
+
+    .year-tab.active {
+      background-color: cornflowerblue;
+      color: white;
+    }
+
+    .year-tab:hover {
+      background-color: lightblue;
+    }
+  </style>
+</head>
+<body>
+  <h1>Poverty Headcount Ratio</h1>
+
+  <div id="year-tabs">
+    <button class="year-tab active" data-year="2019">2019</button>
+    <button class="year-tab" data-year="2020">2020</button>
+    <button class="year-tab" data-year="2021">2021</button>
+    <button class="year-tab" data-year="2022">2022</button>
+    <button class="year-tab" data-year="2023">2023</button>
+  </div>
+
+  <div id="map" style="margin-top: 10px;"></div>
+  <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+      <div style="background-color: red; width: 20px; height: 20px; margin-right: 10px;"></div>
+      <span>50% 以上</span>
+    </div>
+    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+      <div style="background-color: pink; width: 20px; height: 20px; margin-right: 10px;"></div>
+      <span>25~50%</span>
+    </div>
+    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+      <div style="background-color: lightblue; width: 20px; height: 20px; margin-right: 10px;"></div>
+      <span>10~25%</span>
+    </div>
+    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+      <div style="background-color: lightgreen; width: 20px; height: 20px; margin-right: 10px;"></div>
+      <span>1~10%</span>
+    </div>
+    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+      <div style="background-color: mediumseagreen; width: 20px; height: 20px; margin-right: 10px;"></div>
+      <span>1%以下</span>
+    </div>
+    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+      <div style="background-color: lightgray; width: 20px; height: 20px; margin-right: 10px;"></div>
+      <span>データなし</span>
+    </div>
+  </div>
+
+
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const width = 960;
+      const height = 500;
+      const svg = d3.select("#map")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    // 地図を読み込んで保持する
+    let worldData;
+      d3.json('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson').then(function(world) {
+      worldData = world;
+      updateMap(2019); // 初期は2019年を表示
+    });
+
+    function normalizeCountryName(name) {
+      const nameMap = {
+        'The Bahamas' : 'Bahamas, The',
+        'Brunei' : 'Brunei Darussalam',
+        'Ivory Coast' : 'Cote d\'Ivoire',
+        'Democratic Republic of the Congo' : 'Congo, Dem. Rep.',
+        'Republic of the Congo' : 'Congo, Rep.',
+        'Northern Cyprus' : 'Cyprus',
+        'Egypt' : 'Egypt, Arab Rep.',
+        'England': 'United Kingdom',
+        'Gambia' : 'Gambia, The',
+        'Guinea Bissau' : 'Guinea-Bissau',
+        'Iran' : 'Iran, Islamic Rep.',
+        'Kyrgyzstan' : 'Kyrgyz Republic',
+        'South Korea' : 'Korea, Rep.',
+        'Laos' : 'Lao PDR',
+        'Macedonia' : 'North Macedonia',
+        'North Korea' : 'Korea, Dem. People\'s Rep.',
+        'Russia' : 'Russian Federation',
+        'Somaliland' : 'Somalia',
+        'Republic of Serbia' : 'Serbia',
+        'Slovakia' : 'Slovak Republic',
+        'Swaziland' : 'Eswatini',
+        'Syria' : 'Syrian Arab Republic',
+        'East Timor' : 'Timor-Leste',
+        'Turkey' : 'Turkiye',
+        'United Republic of Tanzania' : 'Tanzania',
+        'USA': 'United States',
+        'Venezuela' : 'Venezuela, RB',
+        'Vietnam' : 'Viet Nam',
+        'West Bank' : 'West Bank and Gaza',
+        'Yemen' : 'Yemen, Rep.',
+
+
+      };
+      return nameMap[name] || name; // マップに存在しなければ元の名前を返す
+    }
+    function updateMap(year) {
+      // APIからデータを取得
+      fetch(`/api/poverty?year=${year}`)
+        .then(response => response.json())
+        .then(data => {
+          console.log("data", data);
+          const colorScale = d3.scaleThreshold()
+            .domain([1, 10, 25, 50])
+            .range(["mediumseagreen", "lightgreen", "lightblue", "pink", "red"]);
+
+          svg.selectAll("path").remove();
+
+        // 地図を描画
+        svg.append("g")
+          .selectAll("path")
+            .data(worldData.features)
+          .enter()
+          .append("path")
+          .attr("d", d3.geoPath().projection(d3.geoMercator().scale(150).translate([width / 2, height / 2])))
+          .attr("fill", function(d) {
+            const geoCountryName = d.properties.name;
+            const normalizedCountryName = normalizeCountryName(geoCountryName);
+            const countryData = data.find(item => item.name === normalizedCountryName);
+            // console.log("0", colorScale(0));
+            // console.log("25", colorScale(25));
+            // console.log("50", colorScale(50));
+            // if(countryData){
+            //   console.log(`GeoJSON Country: ${geoCountryName}, API Country: ${normalizedCountryName}, Data: ${countryData.rate}`);
+            //   const fillColor = countryData ? colorScale(countryData.rate) : 'lightgrey';
+            //   console.log(`Fill Color for ${geoCountryName}: ${fillColor}`);
+            //   console.log(`Color scale value for ${countryData.rate}: ${colorScale(countryData.rate)}`); 
+            // } else {
+            //   console.log(`No data found for ${geoCountryName}`);
+            // }
+            return countryData && countryData.rate !== null ? colorScale(countryData.rate) : 'lightgray';
+            // return countryData ? colorScale(countryData.rate) : 'lightgray';
+          })
+          .attr("stroke", "#333");
+        })
+          .catch(error => {
+            console.error('Error fetching data:', error);
+      });
+    }
+
+      // 年を切り替えるためのタブのイベントリスナーを追加
+      document.querySelectorAll('.year-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+          const year = this.getAttribute('data-year');
+          updateMap(year);
+          // buttonカラー更新
+          document.querySelectorAll('.year-tab').forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+        });
+      });
+    });
+  </script>
+</body>
+</html>
